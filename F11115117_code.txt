@@ -1,0 +1,215 @@
+# Text Mining - Practice 1
+# David Medina Rosner - F11115117
+
+# Libraries -----------------------------------------------------------------
+from nltk.tokenize import WordPunctTokenizer
+
+import nltk
+from nltk.corpus import stopwords
+
+from nltk.stem.porter import *
+
+from num2words import num2words
+
+from pathlib import Path
+import string
+
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+import numpy as nmp
+import pandas as pnd
+
+# Global variables ----------------------------------------------------------
+clean_documents = []
+documents_names = []
+clean_queries = []
+queries_names = []
+
+
+# PRE-PROCESSING ------------------------------------------------------------
+#
+# 1. Get the vocabulary (clean words) by following the pre-processing steps
+#    for both queries and documents down below:  
+#      • Convert lower case  
+#      • Tokenization  
+#      • Stopword removal  
+#      • Apostrophe removal  
+#      • Stemming  
+#      • Punctuation removal  
+#      • Convert number to words (num2words) if you found a meaningful
+#        numerical information in the document  
+#      • Stemming after convert numbers to words  
+#      • Punctuation removal after convert numbers to words
+
+# Methods -------------------------------------------------------------------
+
+# Convert to lower case
+def to_lower_case(string):
+    return string.lower()
+
+# Tokenization
+def to_tokenize(string):
+    tokenizer = WordPunctTokenizer()
+    return tokenizer.tokenize(string)
+
+# Stopwords removal
+def to_remove_stopwords(string_list):
+    stop_words = stopwords.words('english')
+    words = [word for word in string_list if word not in stop_words]
+    return words
+
+# Apostrophe removal
+def to_remove_apostrophe(string_list):
+    symbol = ["'"]
+    words = [word for word in string_list if word not in symbol]
+    return words
+
+# Stemming
+def to_stem(string_list):
+    stemmer = PorterStemmer()
+    words = [stemmer.stem(word) for word in string_list]
+    return words
+
+# Punctuation removal: is supposed to remove !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+# within the string sentences and overall form the list
+def to_remove_punctuation(string_list):
+    # Remove a punctuation string in the list
+    words = [word for word in string_list if word not in string.punctuation]
+    
+    translator = str.maketrans('', '', string.punctuation)
+    # Remove punctuation from within each string in the list
+    new_list = []
+    for word in words:
+        new_string = word.translate(translator)
+        new_list.append(new_string)
+    return new_list
+
+# Convert number to words (num2words)
+def to_convert_num2words(string_list):
+    words = [num2words(word) if word.isdigit() else word for word in string_list]
+    return words
+
+# To preprocess the content of a .txt file
+def to_preprocess(text):
+        text = to_lower_case(text) # text is a string after assignment
+        text = to_tokenize(text) # text is a list[] of strings after assignment
+        text = to_remove_stopwords(text)
+        text = to_remove_apostrophe(text) 
+        text = to_stem(text)
+        text = to_remove_punctuation(text)
+#         text = to_convert_num2words(text)
+#         text = ' '.join(text)
+#         text = to_tokenize(text) 
+#         text = to_remove_stopwords(text)
+#         text = to_stem(text)
+#         text = to_remove_punctuation(text)
+        return ' '.join(text)
+
+# To preprocess all .txt files in a folder
+def to_preprocess_folder(folder_path):
+    files = sorted(Path(folder_path).glob('*.txt'))
+    
+    # To sort the folder paths
+    unsorted_paths = []
+    unsorted_paths = [file.stem for file in files]
+    unsorted_paths = [int(x) for x in unsorted_paths]
+    path_index = nmp.argsort(unsorted_paths)
+    sorted_paths = []
+    for item in path_index:
+        sorted_paths.append(files[item])
+    files = sorted_paths
+    
+    clean_text = []
+    text_names = []
+    
+    for file in files:
+        # to read ALL files
+        with open(file, 'r') as flr:
+            text = flr.read() # .read() returns "string"
+
+        text = to_preprocess(text)
+        
+        clean_text.append(text)
+        text_names.append(file.stem)
+    
+    return text_names, clean_text
+
+# Main() --------------------------------------------------------------------
+
+queries_path = r'C:\Users\medar\Desktop\text_mining_anaconda\practice_1\queries'
+queries_names, clean_queries = to_preprocess_folder(queries_path)
+
+documents_path = r'C:\Users\medar\Desktop\text_mining_anaconda\practice_1\documents'
+documents_names, clean_documents = to_preprocess_folder(documents_path)
+
+
+# TF * IDF ------------------------------------------------------------------
+#
+# 2. Transform the term vocabulary (clean words) into vector space, then
+#    calculate each Term Weighting using TF*IDF score:
+#      • Create your own vector and your own code for the tf*idf formula, or
+#      • Using CountVectorizer + TfidfTransformer, or
+#     >• Using TfidfVectorizer
+
+# Main() --------------------------------------------------------------------
+
+# Create instance of class CountVectorizer()
+vectorizer = CountVectorizer(min_df=5)
+
+# Learn vocabulary and create document-term matrix
+trained_matrix = vectorizer.fit_transform(clean_documents)
+
+# Create instance of class TfidfTransformer()
+tfidf_transformer = TfidfTransformer()
+
+# Calculate TF*IDF scores for the document-term matrix
+trained_tfidf_matrix = tfidf_transformer.fit_transform(trained_matrix)
+
+# Transform queries to document-term matrix
+queries_matrix = vectorizer.transform(clean_queries)
+
+# Calculate TF*IDF scores for the query document-term matrix
+queries_tfidf_matrix = tfidf_transformer.transform(queries_matrix)
+
+
+# COSINE SIMILARITY ---------------------------------------------------------
+#
+# 3. Query and document similarity
+#      • Calculate Similarity score of query and document set using cosine
+#        similarity or its derivation. The cosine formula is attached, you
+#        can choose one of the formulas
+
+# Main() --------------------------------------------------------------------
+
+# Calculates the 'Cosine Similarity'
+cosine_similarity = cosine_similarity(queries_tfidf_matrix, trained_tfidf_matrix)
+
+
+# RANKING AND PRINTING TO .csv ----------------------------------------------
+#
+# 4. Rank/sort the documents given the query based on the similarity score
+#    (descending)
+#
+# 5. Print the output with query, and sorted documents. Then submit your
+#    work on Kaggle
+
+# Main() --------------------------------------------------------------------
+
+# Rank the documents
+queries_documents_pair = []
+
+for index in range(len(clean_queries)):
+    queries_csv = queries_names[index]
+    
+    ranking_index = nmp.argsort(cosine_similarity[index])[::-1][:10]
+    
+    documents_csv = ''
+    for index in ranking_index:
+        documents_csv += documents_names[index] + ' '
+
+    queries_documents_pair.append((queries_csv, documents_csv))
+
+# Create Pandas DataFrame to .csv
+submission = pnd.DataFrame(queries_documents_pair, columns=['Query', 'RetrievedDocuments'])
+submission.to_csv('David_Medina_35.csv', index=False)
